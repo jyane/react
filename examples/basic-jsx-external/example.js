@@ -1,3 +1,6 @@
+/**
+ * @jsx React.DOM
+ */
 var ExampleApplication = React.createClass({
   render: function() {
     var elapsed = Math.round(this.props.elapsed  / 100);
@@ -12,7 +15,7 @@ var ExampleApplication = React.createClass({
 var start = new Date().getTime();
 
 setInterval(function() {
-  ReactDOM.render(
+  React.renderComponent(
     <ExampleApplication elapsed={new Date().getTime() - start} />,
     document.getElementById('container')
   );

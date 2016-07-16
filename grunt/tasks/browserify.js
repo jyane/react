@@ -12,42 +12,39 @@ module.exports = function() {
   // More/better assertions
   // grunt.config.requires('outfile');
   // grunt.config.requires('entries');
+  config.requires = config.requires || {};
   config.transforms = config.transforms || [];
-  config.globalTransforms = config.globalTransforms || [];
-  config.plugins = config.plugins || [];
   config.after = config.after || [];
+  if (typeof config.after === 'function') {
+    config.after = [config.after];
+  }
 
   // create the bundle we'll work with
   var entries = grunt.file.expand(config.entries);
+  var bundle = browserify(entries);
+
+  // Make sure the things that need to be exposed are.
+  // TODO: support a blob pattern maybe?
+  for (var name in config.requires) {
+    bundle.require(config.requires[name], { expose: name });
+  }
 
   // Extract other options
   var options = {
-    entries: entries,
     debug: config.debug, // sourcemaps
-    standalone: config.standalone, // global
+    standalone: config.standalone // global
   };
 
-  var bundle = browserify(options);
-
-  config.transforms.forEach(function(transform) {
-    bundle.transform({}, transform);
-  });
-
-  config.globalTransforms.forEach(function(transform) {
-    bundle.transform({global: true}, transform);
-  });
-
-  config.plugins.forEach(bundle.plugin, bundle);
+  // TODO: make sure this works, test with this too
+  config.transforms.forEach(bundle.transform, this);
 
   // Actually bundle it up
   var _this = this;
-  bundle.bundle(function(err, buf) {
+  bundle.bundle(options, function(err, src) {
     if (err) {
       grunt.log.error(err);
-      return done();
+      done();
     }
-
-    var src = buf.toString();
 
     config.after.forEach(function(fn) {
       src = fn.call(_this, src);

@@ -1,23 +1,29 @@
 /**
- * Copyright 2013-present, Facebook, Inc.
- * All rights reserved.
+ * Copyright 2013 Facebook, Inc.
  *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  * @providesModule reactComponentExpect
+ * @nolint
  */
 
-'use strict';
-
-var ReactInstanceMap = require('ReactInstanceMap');
+var ReactComponent = require('ReactComponent');
 var ReactTestUtils = require('ReactTestUtils');
 
-var invariant = require('invariant');
+var copyProperties = require('copyProperties');
 
 function reactComponentExpect(instance) {
-  if (instance instanceof reactComponentExpectInternal) {
+  if (instance instanceof reactComponentExpect) {
     return instance;
   }
 
@@ -25,34 +31,18 @@ function reactComponentExpect(instance) {
     return new reactComponentExpect(instance);
   }
 
-  expect(instance).not.toBeNull();
-  expect(instance).not.toBeUndefined();
-
-  invariant(
-    ReactTestUtils.isCompositeComponent(instance),
-    'reactComponentExpect(...): instance must be a composite component'
-  );
-  var internalInstance = ReactInstanceMap.get(instance);
-
-  expect(typeof internalInstance).toBe('object');
-  expect(typeof internalInstance.constructor).toBe('function');
-  expect(ReactTestUtils.isElement(internalInstance)).toBe(false);
-
-  return new reactComponentExpectInternal(internalInstance);
+  this._instance = instance;
+  this.toBeValidReactComponent();
 }
 
-function reactComponentExpectInternal(internalInstance) {
-  this._instance = internalInstance;
-}
-
-Object.assign(reactComponentExpectInternal.prototype, {
+copyProperties(reactComponentExpect.prototype, {
   // Getters -------------------------------------------------------------------
 
   /**
    * @instance: Retrieves the backing instance.
    */
   instance: function() {
-    return this._instance.getPublicInstance();
+    return this._instance;
   },
 
   /**
@@ -71,9 +61,7 @@ Object.assign(reactComponentExpectInternal.prototype, {
    */
   expectRenderedChild: function() {
     this.toBeCompositeComponent();
-    var child = this._instance._renderedComponent;
-    // TODO: Hide ReactEmptyComponent instances here?
-    return new reactComponentExpectInternal(child);
+    return new reactComponentExpect(this.instance()._renderedComponent);
   },
 
   /**
@@ -83,74 +71,68 @@ Object.assign(reactComponentExpectInternal.prototype, {
     // Currently only dom components have arrays of children, but that will
     // change soon.
     this.toBeDOMComponent();
-    var renderedChildren =
-      this._instance._renderedChildren || {};
-    for (var name in renderedChildren) {
+    var renderedChildren = this.instance()._renderedChildren || {};
+    var nonEmptyCount = 0;
+    var name;
+    for (name in renderedChildren) {
       if (!renderedChildren.hasOwnProperty(name)) {
         continue;
       }
       if (renderedChildren[name]) {
-        if (renderedChildren[name]._mountIndex === childIndex) {
-          return new reactComponentExpectInternal(renderedChildren[name]);
+        if (nonEmptyCount === childIndex) {
+          return new reactComponentExpect(renderedChildren[name]);
         }
+        nonEmptyCount++;
       }
     }
     throw new Error('Child:' + childIndex + ' is not found');
   },
 
-  toBeDOMComponentWithChildCount: function(count) {
+  toBeDOMComponentWithChildCount: function(n) {
     this.toBeDOMComponent();
-    var renderedChildren = this._instance._renderedChildren;
-    expect(renderedChildren).toBeTruthy();
-    expect(Object.keys(renderedChildren).length).toBe(count);
+    expect(this.instance()._renderedChildren).toBeTruthy();
+    var len = Object.keys(this.instance()._renderedChildren).length;
+    expect(len).toBe(n);
     return this;
   },
 
   toBeDOMComponentWithNoChildren: function() {
     this.toBeDOMComponent();
-    expect(this._instance._renderedChildren).toBeFalsy();
+    expect(this.instance()._renderedChildren).toBeFalsy();
     return this;
   },
 
   // Matchers ------------------------------------------------------------------
-
-  toBeComponentOfType: function(constructor) {
-    expect(
-      this._instance._currentElement.type === constructor
-    ).toBe(true);
-    return this;
-  },
 
   /**
    * A component that is created with React.createClass. Just duck typing
    * here.
    */
   toBeCompositeComponent: function() {
-    expect(
-      typeof this.instance() === 'object' &&
-      typeof this.instance().render === 'function'
-    ).toBe(true);
+    this.toBeValidReactComponent();
+    expect(ReactTestUtils.isCompositeComponent(this.instance())).toBe(true);
     return this;
   },
 
-  toBeCompositeComponentWithType: function(constructor) {
-    this.toBeCompositeComponent();
-    expect(
-      this._instance._currentElement.type === constructor
-    ).toBe(true);
+  toBeCompositeComponentWithType: function(convenienceConstructor) {
+    expect(ReactTestUtils.isCompositeComponentWithType(
+      this.instance(),
+      convenienceConstructor
+    )).toBe(true);
     return this;
   },
 
-  toBeTextComponentWithValue: function(val) {
-    var elementType = typeof this._instance._currentElement;
-    expect(elementType === 'string' || elementType === 'number').toBe(true);
-    expect(this._instance._stringText).toBe(val);
+  toBeTextComponent: function() {
+    expect(ReactTestUtils.isTextComponent(this.instance())).toBe(true);
     return this;
   },
 
-  toBeEmptyComponent: function() {
-    var element = this._instance._currentElement;
-    return element === null || element === false;
+  /**
+   * Falsy values are valid components - the vanished component that is.
+   */
+  toBeValidReactComponent: function() {
+    expect(ReactComponent.isValidComponent(this.instance())).toBe(true);
+    return this;
   },
 
   toBePresent: function() {
@@ -167,10 +149,6 @@ Object.assign(reactComponentExpectInternal.prototype, {
     return this;
   },
 
-  /**
-   * @deprecated
-   * @see toBeComponentOfType
-   */
   toBeDOMComponentWithTag: function(tag) {
     this.toBeDOMComponent();
     expect(this.instance().tagName).toBe(tag.toUpperCase());
@@ -206,23 +184,7 @@ Object.assign(reactComponentExpectInternal.prototype, {
         .toEqual(propNameToExpectedValue[propName]);
     }
     return this;
-  },
-
-  /**
-   * Check a set of props are equal to a set of expected values - only works
-   * with scalars.
-   */
-  scalarContextEqual: function(contextNameToExpectedValue) {
-    expect(this.instance()).toBeTruthy();
-    for (var contextName in contextNameToExpectedValue) {
-      if (!contextNameToExpectedValue.hasOwnProperty(contextName)) {
-        continue;
-      }
-      expect(this.instance().context[contextName])
-        .toEqual(contextNameToExpectedValue[contextName]);
-    }
-    return this;
-  },
+  }
 });
 
 module.exports = reactComponentExpect;

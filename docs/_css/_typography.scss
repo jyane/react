@@ -6,6 +6,7 @@ $textColorLight: lighten($textColor, 20%);
 html {
   font-family: $helvetica;
   font-family: proxima-nova, $helvetica;
+  font-weight: 300;
   color: $textColor;
   line-height: 1.28;
 }
@@ -68,7 +69,7 @@ h3 {
 }
 
 h4 {
-  font-size: 16px;
+  font-size: 17px;
 }
 
 h5 {
@@ -131,3 +132,5 @@ a {
 .center {
   text-align: center;
 }
+
+

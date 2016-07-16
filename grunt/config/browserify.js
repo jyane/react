@@ -1,117 +1,94 @@
-/*eslint-disable no-multi-str */
+/* jshint multistr:true */
+/* jshint -W040 */
 
 'use strict';
 
-var envify = require('loose-envify/custom');
 var grunt = require('grunt');
 var UglifyJS = require('uglify-js');
-var uglifyify = require('uglifyify');
-var derequire = require('derequire');
-var collapser = require('bundle-collapser/plugin');
-
-var envifyDev = envify({NODE_ENV: process.env.NODE_ENV || 'development'});
-var envifyProd = envify({NODE_ENV: process.env.NODE_ENV || 'production'});
 
 var SIMPLE_TEMPLATE =
-  grunt.file.read('./grunt/data/header-template-short.txt');
+'/**\n\
+ * @PACKAGE@ v@VERSION@\n\
+ */';
 
 var LICENSE_TEMPLATE =
-  grunt.file.read('./grunt/data/header-template-extended.txt');
+'/**\n\
+ * @PACKAGE@ v@VERSION@\n\
+ *\n\
+ * Copyright 2013 Facebook, Inc.\n\
+ *\n\
+ * Licensed under the Apache License, Version 2.0 (the "License");\n\
+ * you may not use this file except in compliance with the License.\n\
+ * You may obtain a copy of the License at\n\
+ *\n\
+ * http://www.apache.org/licenses/LICENSE-2.0\n\
+ *\n\
+ * Unless required by applicable law or agreed to in writing, software\n\
+ * distributed under the License is distributed on an "AS IS" BASIS,\n\
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n\
+ * See the License for the specific language governing permissions and\n\
+ * limitations under the License.\n\
+ */';
 
 function minify(src) {
-  return UglifyJS.minify(src, {fromString: true}).code;
+  return UglifyJS.minify(src, { fromString: true }).code;
 }
 
 // TODO: move this out to another build step maybe.
 function bannerify(src) {
   var version = grunt.config.data.pkg.version;
-  var packageName = this.data.packageName || this.data.standalone;
-  return (
-    grunt.template.process(
-      LICENSE_TEMPLATE,
-      {data: {package: packageName, version: version}}
-    ) +
-    src
-  );
+  return LICENSE_TEMPLATE.replace('@PACKAGE@', this.data.standalone)
+                         .replace('@VERSION@', version) +
+         '\n' + src;
 }
 
 function simpleBannerify(src) {
   var version = grunt.config.data.pkg.version;
-  var packageName = this.data.packageName || this.data.standalone;
-  return (
-    grunt.template.process(
-      SIMPLE_TEMPLATE,
-      {data: {package: packageName, version: version}}
-    ) +
-    src
-  );
+  return SIMPLE_TEMPLATE.replace('@PACKAGE@', this.data.standalone)
+                        .replace('@VERSION@', version) +
+         '\n' + src;
 }
 
 // Our basic config which we'll add to to make our other builds
 var basic = {
   entries: [
-    './build/modules/ReactUMDEntry.js',
+    './build/modules/React.js'
   ],
   outfile: './build/react.js',
   debug: false,
   standalone: 'React',
-  // Apply as global transform so that we also envify fbjs and any other deps
-  globalTransforms: [envifyDev],
-  plugins: [collapser],
-  after: [derequire, simpleBannerify],
+  after: [simpleBannerify]
 };
 
-var min = {
-  entries: [
-    './build/modules/ReactUMDEntry.js',
-  ],
+var min = grunt.util._.merge({}, basic, {
   outfile: './build/react.min.js',
   debug: false,
-  standalone: 'React',
-  // Envify twice. The first ensures that when we uglifyify, we have the right
-  // conditions to exclude requires. The global transform runs on deps.
-  transforms: [envifyProd, uglifyify],
-  globalTransforms: [envifyProd],
-  plugins: [collapser],
-  // No need to derequire because the minifier will mangle
-  // the "require" calls.
+  after: [minify, bannerify]
+});
 
-  after: [minify, bannerify],
+var transformer = {
+  entries:[
+    './vendor/browser-transforms.js'
+  ],
+  outfile: './build/JSXTransformer.js',
+  debug: false,
+  standalone: 'JSXTransformer',
+  after: [simpleBannerify]
 };
 
-var addons = {
+var test = {
   entries: [
-    './build/modules/ReactWithAddonsUMDEntry.js',
+    "./build/modules/test/all.js",
+    "./build/modules/**/__tests__/*-test.js"
   ],
-  outfile: './build/react-with-addons.js',
+  outfile: './build/react-test.js',
   debug: false,
-  standalone: 'React',
-  packageName: 'React (with addons)',
-  globalTransforms: [envifyDev],
-  plugins: [collapser],
-  after: [derequire, simpleBannerify],
-};
-
-var addonsMin = {
-  entries: [
-    './build/modules/ReactWithAddonsUMDEntry.js',
-  ],
-  outfile: './build/react-with-addons.min.js',
-  debug: false,
-  standalone: 'React',
-  packageName: 'React (with addons)',
-  transforms: [envifyProd, uglifyify],
-  globalTransforms: [envifyProd],
-  plugins: [collapser],
-  // No need to derequire because the minifier will mangle
-  // the "require" calls.
-
-  after: [minify, bannerify],
+  standalone: false
 };
 
 module.exports = {
   basic: basic,
+  test: test,
   min: min,
-  addons: addons,
-  addonsMin: addonsMin,
+  transformer: transformer
 };

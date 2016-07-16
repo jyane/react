@@ -1,43 +1,57 @@
-var TODO_COMPONENT = `
-var TodoList = React.createClass({
-  render: function() {
-    var createItem = function(item) {
-      return <li key={item.id}>{item.text}</li>;
-    };
-    return <ul>{this.props.items.map(createItem)}</ul>;
-  }
-});
-var TodoApp = React.createClass({
-  getInitialState: function() {
-    return {items: [], text: ''};
-  },
-  onChange: function(e) {
-    this.setState({text: e.target.value});
-  },
-  handleSubmit: function(e) {
-    e.preventDefault();
-    var nextItems = this.state.items.concat([{text: this.state.text, id: Date.now()}]);
-    var nextText = '';
-    this.setState({items: nextItems, text: nextText});
-  },
-  render: function() {
-    return (
-      <div>
-        <h3>TODO</h3>
-        <TodoList items={this.state.items} />
-        <form onSubmit={this.handleSubmit}>
-          <input onChange={this.onChange} value={this.state.text} />
-          <button>{'Add #' + (this.state.items.length + 1)}</button>
-        </form>
-      </div>
-    );
-  }
-});
+/**
+ * @jsx React.DOM
+ */
 
-ReactDOM.render(<TodoApp />, mountNode);
-`;
+var TODO_COMPONENT = "\
+/** @jsx React.DOM */\n\
+var TodoList = React.createClass({\n\
+  render: function() {\n\
+    var items = this.props.items.map(function(item) {\n\
+      return <li>{item}</li>;\n\
+    });\n\
+    return <ul>{items}</ul>;\n\
+  }\n\
+});\n\
+\n\
+var TodoCreate = React.createClass({\n\
+  handleSubmit: function() {\n\
+    var textInput = this.refs.textInput.getDOMNode();\n\
+    this.props.onCreate(textInput.value);\n\
+    textInput.value = '';\n\
+    return false;\n\
+  },\n\
+  render: function() {\n\
+    return (\n\
+      <form onSubmit={this.handleSubmit.bind(this)}>\n\
+        <input type=\"text\" ref=\"textInput\" />\n\
+        <button>Add</button>\n\
+      </form>\n\
+    );\n\
+  }\n\
+});\n\
+\n\
+var TodoApp = React.createClass({\n\
+  getInitialState: function() {\n\
+    return {items: []};\n\
+  },\n\
+  onItemCreate: function(value) {\n\
+    this.setState({items: this.state.items.concat([value])});\n\
+  },\n\
+  render: function() {\n\
+    return (\n\
+      <div>\n\
+        <h3>TODO</h3>\n\
+        <TodoList items={this.state.items} />\n\
+        <TodoCreate onCreate={this.onItemCreate.bind(this)} />\n\
+      </div>\n\
+    );\n\
+  }\n\
+});\n\
+\n\
+React.renderComponent(<TodoApp />, mountNode);\
+";
 
-ReactDOM.render(
+React.renderComponent(
   <ReactPlayground codeText={TODO_COMPONENT} />,
   document.getElementById('todoExample')
 );

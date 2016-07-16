@@ -1,5 +1,6 @@
 {
-  "name": "react-haste",
-  "version": "16.0.0-alpha",
-  "license": "BSD-3-Clause"
+  "name": "react",
+  "jstest": {
+    "useAutoMock": false
+  }
 }
